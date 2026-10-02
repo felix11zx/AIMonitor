@@ -54,7 +54,11 @@ public enum JSONValue: Codable, Equatable, Sendable {
             }
             self = .object(obj)
         case .array(var arr):
-            let index = first.number.map(Int.init) ?? first.string.flatMap(Int.init)
+            let index: Int?
+            if let number=first.number {
+                guard number.isFinite, number.rounded(.towardZero) == number, number >= 0, number < Double(Int.max) else { throw MonitorError.invalid("Ungültiger Array-Patch") }
+                index=Int(number)
+            } else { index=first.string.flatMap(Int.init) }
             guard let i = index, i >= 0 else { throw MonitorError.invalid("Ungültiger Array-Patch") }
             if tail.isEmpty, operation == "add" { guard i <= arr.count else { throw MonitorError.invalid("Patch-Index fehlt") }; arr.insert(value, at: i) }
             else {

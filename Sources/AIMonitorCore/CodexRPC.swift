@@ -8,11 +8,15 @@ public actor CodexRPC {
     private var buffer=Data()
     private var configuration=""
     private var nextID=1
+    private var pendingResponses: [Int:JSONValue]=[:]
+    private var notificationTask: Task<Void,Never>?
+    private var onLimitsChanged: (@Sendable () -> Void)?
     public init() {}
 
-    public func readLimits(executable: String, home: URL) throws -> UsageSnapshot {
+    public func readLimits(executable: String, home: URL, onLimitsChanged: (@Sendable () -> Void)? = nil) throws -> UsageSnapshot {
         do {
-            let config=executable+home.path
+            self.onLimitsChanged=onLimitsChanged
+            let config=executable+"\0"+home.path
             if process?.isRunning != true || config != configuration {
                 shutdown(); configuration=config
                 let child=Process(), stdin=Pipe(), stdout=Pipe(), stderr=Pipe()
@@ -23,12 +27,19 @@ public actor CodexRPC {
                 environment["PATH"]="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:"+(environment["PATH"] ?? "")
                 child.environment=environment
                 child.standardInput=stdin;child.standardOutput=stdout;child.standardError=stderr
-                stderr.fileHandleForReading.readabilityHandler={ handle in _ = handle.availableData }
+                stderr.fileHandleForReading.readabilityHandler={ handle in if handle.availableData.isEmpty { handle.readabilityHandler=nil } }
                 try child.run();process=child;input=stdin.fileHandleForWriting;output=stdout.fileHandleForReading
                 let id=nextID;nextID+=1
                 try send(.object(["id":.number(Double(id)),"method":.string("initialize"),"params":.object(["clientInfo":.object(["name":.string("aimonitor"),"title":.string("AIMonitor"),"version":.string("0.1.0")])])]))
                 _ = try response(id:id)
                 try send(.object(["method":.string("initialized")]))
+                notificationTask=Task { [weak self] in
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds:1_000_000_000)
+                        guard !Task.isCancelled else { return }
+                        await self?.pollNotifications()
+                    }
+                }
             }
             let id=nextID;nextID+=1
             try send(.object(["id":.number(Double(id)),"method":.string("account/rateLimits/read")]))
@@ -46,9 +57,15 @@ public actor CodexRPC {
     private func response(id: Int) throws -> JSONValue {
         let deadline=Date().addingTimeInterval(20)
         while Date() < deadline {
+            if let message=pendingResponses.removeValue(forKey:id) {
+                if message["error"].object != nil { throw MonitorError.invalid("Codex-Limits sind derzeit nicht verfügbar.") }
+                return message["result"]
+            }
             if let newline=buffer.firstIndex(of:10) {
                 let line=Data(buffer[..<newline]);buffer=Data(buffer.dropFirst(buffer.distance(from:buffer.startIndex,to:newline)+1))
-                guard let message=try? JSONDecoder().decode(JSONValue.self,from:line),message["id"].number == Double(id) else { continue }
+                guard let message=try? JSONDecoder().decode(JSONValue.self,from:line) else { continue }
+                if message["method"].string == "account/rateLimits/updated" { onLimitsChanged?();continue }
+                guard message["id"].number == Double(id) else { continue }
                 if message["error"].object != nil {
                     let message=message["error"]["message"].string?.lowercased() ?? ""
                     throw MonitorError.invalid(message.contains("auth") || message.contains("login") || message.contains("sign") ? "Codex-Anmeldung fehlt oder ist abgelaufen. Bitte in Codex anmelden." : "Codex-Limits sind derzeit nicht verfügbar.")
@@ -67,7 +84,25 @@ public actor CodexRPC {
         }
         throw MonitorError.invalid("Codex antwortet nicht. Die Verbindung wird erneut versucht.")
     }
+    private func pollNotifications() {
+        guard let output, process?.isRunning == true else { return }
+        var poller=pollfd(fd:output.fileDescriptor,events:Int16(POLLIN),revents:0)
+        while poll(&poller,1,0) > 0 {
+            var chunk=[UInt8](repeating:0,count:65536)
+            let count=Darwin.read(output.fileDescriptor,&chunk,chunk.count)
+            guard count > 0 else { shutdown();return }
+            buffer.append(contentsOf:chunk.prefix(count))
+            if buffer.count > 16*1024*1024 { shutdown();return }
+        }
+        while let newline=buffer.firstIndex(of:10) {
+            let line=Data(buffer[..<newline]);buffer=Data(buffer.dropFirst(buffer.distance(from:buffer.startIndex,to:newline)+1))
+            guard let message=try? JSONDecoder().decode(JSONValue.self,from:line) else { continue }
+            if message["method"].string == "account/rateLimits/updated" { onLimitsChanged?() }
+            else if let number=message["id"].number,number.isFinite,number >= 0,number < Double(Int.max),number.rounded() == number { pendingResponses[Int(number)]=message }
+        }
+    }
     public func shutdown() {
+        notificationTask?.cancel();notificationTask=nil;pendingResponses.removeAll()
         try? input?.close();input=nil;try? output?.close();output=nil;buffer.removeAll()
         if process?.isRunning == true { process?.terminate() };process=nil
     }

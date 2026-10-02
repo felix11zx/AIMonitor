@@ -21,7 +21,7 @@ public struct UsageWindow: Identifiable, Sendable {
     public let resetAt: Date?
     public var remainingPercent: Double? { usedPercent.map { 100 - $0 } }
     public var period: String {
-        guard let minutes = durationMinutes, minutes > 0 else { return "Zeitraum unbekannt" }
+        guard let minutes = durationMinutes, minutes.isFinite, minutes > 0, minutes < Double(Int.max) else { return "Zeitraum unbekannt" }
         if minutes == 10080 { return "Wöchentlich" }
         if minutes.truncatingRemainder(dividingBy: 1440) == 0 { return "\(Int(minutes / 1440)) Tage" }
         if minutes.truncatingRemainder(dividingBy: 60) == 0 { return "\(Int(minutes / 60)) Stunden" }
@@ -41,8 +41,8 @@ public struct UsageSnapshot: Sendable {
                 guard window.object != nil else { continue }
                 result.append(UsageWindow(id: key + "." + kind, bucket: bucket["limitName"].string ?? key,
                     usedPercent: window["usedPercent"].number.flatMap { $0.isFinite ? min(100, max(0, $0)) : nil },
-                    durationMinutes: window["windowDurationMins"].number,
-                    resetAt: window["resetsAt"].number.map { Date(timeIntervalSince1970: $0) }))
+                    durationMinutes: window["windowDurationMins"].number.flatMap { $0.isFinite && $0 > 0 && $0 < Double(Int.max) ? $0 : nil },
+                    resetAt: window["resetsAt"].number.flatMap { $0.isFinite && $0 >= -62135596800 && $0 < 253402300800 ? Date(timeIntervalSince1970: $0) : nil }))
             }
         }
         return Self(windows: result)

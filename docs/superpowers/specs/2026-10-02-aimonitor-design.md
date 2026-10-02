@@ -70,7 +70,7 @@ Codex-Hooks liefern die Lifecycle-Ereignisse für genaue CLI-Statusänderungen. 
 
 Die CLI-Anbindung wird in den Einstellungen explizit aktiviert. Ein Installer ergänzt nur AIMonitors eigene Hook-Einträge, erhält vorhandene Hooks, speichert eine Sicherung und entfernt beim Deaktivieren nur die eigenen Einträge. Er beantwortet keine Codex-Freigaben und fügt dem Agent keine Anweisungen hinzu. Bereits laufende CLI-Sessions können einen Neustart benötigen, bevor neue Hooks geladen werden; dies wird beim Aktivieren erklärt. Ohne diese Anbindung zeigt die App vorhandene Sessions und belegte Session-Ereignisse, kennzeichnet aber eine nicht belegbare Eingabeerkennung als unvollständig.
 
-Die Hook-Verträge sind dokumentiert, die vollständige CLI-Integration ist bislang noch nicht ausgeführt. Die Umsetzung muss insbesondere das Auflösen abgelehnter Freigaben und tatsächlich offener Eingabefragen überprüfen; Prozessanwesenheit allein erfüllt die Statusanforderung nicht.
+Die Hook-Verträge sind dokumentiert. In der Umsetzung wurden die echte CLI-Hook-Ausführung, offene Eingabefragen, angenommene/abgelehnte Freigaben, Unterbrechung und Prozessende verifiziert; Nachweise stehen in `docs/verification.md`. Prozessanwesenheit allein erfüllt die Statusanforderung nicht.
 
 ## Datenfluss und Betrieb
 
@@ -101,4 +101,4 @@ Disconnects, Sleep/Wake, fehlende Dateien, teilweise geschriebene JSON-Zeilen un
 
 ## Reviewstand
 
-Der Chat-Entwurf und die Überwachung beider Codex-Varianten sind bestätigt. Dieses Dokument konkretisiert die Datenanbindung und wartet auf das Review des Nutzers. Danach folgt der schriftliche Implementierungsplan; Produktcode wird erst nach dessen Freigabe geschrieben.
+Der Nutzer hat die Umsetzung am 2. Oktober 2026 mit „Passt genau so umsetzen“ freigegeben. Implementation, unabhängiges Review und Integrationstests sind abgeschlossen. Der Nutzer bestätigte Links-/Rechtsklick und das bewegliche Monitorfenster. Details und tatsächliche Kompatibilitätsgrenzen stehen in `docs/verification.md` und `README.md`.

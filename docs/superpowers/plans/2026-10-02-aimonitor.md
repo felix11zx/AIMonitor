@@ -1,6 +1,6 @@
 # AIMonitor Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Native Menüleisten-App mit normalen Fenstern und echten Codex-Limits sowie Desktop-/CLI-Status bauen.
 
@@ -35,10 +35,10 @@
 
 **Interfaces:** Produces `UsageSnapshot.decode(_:)`, `AgentStatus`, `AgentRecord`, `DesktopState.apply(_:)`, `HookEvent`, `CLIState.apply(_:)`.
 
-- [ ] Tests für mehrere Buckets, fehlende Prozent, Reset-Sekunden, Orange-Vorrang, Revisionlücken, Array-Patches und verspätete Hooks schreiben.
-- [ ] `swift test` ausführen, fehlende Implementierung nachweisen.
-- [ ] Normalisierung und Reducer implementieren; unbekannte Werte bleiben unbekannt.
-- [ ] `swift test` besteht; Modelle/Tests lokal committen.
+- [x] Tests für mehrere Buckets, fehlende Prozent, Reset-Sekunden, Orange-Vorrang, Revisionlücken, Array-Patches und verspätete Hooks schreiben.
+- [x] `swift test` ausführen, fehlende Implementierung nachweisen.
+- [x] Normalisierung und Reducer implementieren; unbekannte Werte bleiben unbekannt.
+- [x] `swift test` besteht; Modelle/Tests lokal committen.
 
 ### Task 2: Live-Adapter und CLI-Anbindung
 
@@ -46,10 +46,10 @@
 
 **Interfaces:** Consumes Task 1; produces `Catalog.read(home:)`, `CodexRPC.readLimits(executable:home:)`, `DesktopIPC.observe(ids:onEvent:)`, `HookInstaller.setEnabled(_:home:executable:)`, `HookRecorder.record(_:)`.
 
-- [ ] Hook-Merge/Uninstall/Backup, fragmentierte Frames und Prozessende als Tests mit temporären Verzeichnissen schreiben und fehlschlagen sehen.
-- [ ] SQLite-Katalog nur lesend, zeitlich begrenztes RPC und abgesicherten Socket mit Hintergrund-I/O implementieren.
-- [ ] Hook-Helper speichert nur Statusmetadaten; Installer erhält fremde Einträge und arbeitet atomar.
-- [ ] Tests bestehen; echte Limits und Desktop-Snapshot mit installiertem Codex lesen. Lokaler Commit.
+- [x] Hook-Merge/Uninstall/Backup, fragmentierte Frames und Prozessende als Tests mit temporären Verzeichnissen schreiben und fehlschlagen sehen.
+- [x] SQLite-Katalog nur lesend, zeitlich begrenztes RPC und abgesicherten Socket mit Hintergrund-I/O implementieren.
+- [x] Hook-Helper speichert nur Statusmetadaten; Installer erhält fremde Einträge und arbeitet atomar.
+- [x] Tests bestehen; echte Limits und Desktop-Snapshot mit installiertem Codex lesen. Lokaler Commit.
 
 ### Task 3: Native App, Fenster und UI
 
@@ -57,10 +57,10 @@
 
 **Interfaces:** Consumes Task 1/2; produces `dist/AIMonitor.app` and `./script/build_and_run.sh`.
 
-- [ ] MainActor-Store, Lifecycle/Refresh, AppKit-StatusItem und genau ein Fenster pro Rolle implementieren.
-- [ ] Native Limit-/Agent-Zeilen, lokale Countdowns, klare Fehler-/Verbindungsanzeige, Erscheinungsbild und CLI-Setup umsetzen.
-- [ ] Bundle erstellen; Run-Aktion erst danach konfigurieren.
-- [ ] `swift test` und Build bestehen. App starten und reale Daten sowie beide Klickwege, Verschieben/Fokus/Schließen/Wiederöffnen und Appearance prüfen. Lokaler Commit.
+- [x] MainActor-Store, Lifecycle/Refresh, AppKit-StatusItem und genau ein Fenster pro Rolle implementieren.
+- [x] Native Limit-/Agent-Zeilen, lokale Countdowns, klare Fehler-/Verbindungsanzeige, Erscheinungsbild und CLI-Setup umsetzen.
+- [x] Bundle erstellen; Run-Aktion erst danach konfigurieren.
+- [x] `swift test` und Build bestehen. App starten und reale Daten sowie beide Klickwege, Verschieben/Fokus/Schließen/Wiederöffnen und Appearance prüfen. Lokaler Commit.
 
 ### Task 4: Integration, Review und Auslieferung
 
@@ -68,10 +68,10 @@
 
 **Interfaces:** Consumes fertige App, Tests und Live-Adapter; produces dokumentierte startbare App und Anbindung.
 
-- [ ] Tatsächliche CLI-Hook-Ausführung für Arbeit, Eingabe, Freigabe/Ablehnung und Ende überprüfen; vollständige Anbindung muss bestehen.
-- [ ] Einen frischen Reviewer auf gesamte Änderung und Review Focus ansetzen, notwendige Fehler beheben und gezielt nachtesten.
-- [ ] Build/Tests abschließend ausführen, Nachweise und eventuelle echte Einschränkungen dokumentieren. Lokaler Commit.
-- [ ] App geöffnet bereitstellen; Ziel nur bei vollständig belegter Abnahme als erreicht markieren.
+- [x] Tatsächliche CLI-Hook-Ausführung für Arbeit, Eingabe, Freigabe/Ablehnung und Ende überprüfen; vollständige Anbindung muss bestehen.
+- [x] Einen frischen Reviewer auf gesamte Änderung und Review Focus ansetzen, notwendige Fehler beheben und gezielt nachtesten.
+- [x] Build/Tests abschließend ausführen, Nachweise und eventuelle echte Einschränkungen dokumentieren. Lokaler Commit.
+- [x] App geöffnet bereitstellen; Ziel nur bei vollständig belegter Abnahme als erreicht markieren.
 
 ## Ausführung
 

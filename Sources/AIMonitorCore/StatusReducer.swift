@@ -37,39 +37,77 @@ public struct HookEvent: Codable, Sendable {
     public let toolName: String?
     public let timestamp: Double
     public let processID: Int32?
-    public init(sessionID: String, turnID: String?, kind: String, toolID: String?, toolName: String?, timestamp: Double, processID: Int32?) {
-        self.sessionID=sessionID; self.turnID=turnID; self.kind=kind; self.toolID=toolID; self.toolName=toolName; self.timestamp=timestamp; self.processID=processID
+    public let requestID: String?
+    public init(sessionID: String, turnID: String?, kind: String, toolID: String?, toolName: String?, timestamp: Double, processID: Int32?, requestID: String? = nil) {
+        self.sessionID=sessionID; self.turnID=turnID; self.kind=kind; self.toolID=toolID; self.toolName=toolName; self.timestamp=timestamp; self.processID=processID; self.requestID=requestID
     }
 }
 
-public struct CLIState {
+public struct CLIState: Codable, Sendable, Equatable {
     public private(set) var status: AgentStatus = .unknown
     public private(set) var turnID: String?
     public private(set) var timestamp: Double = 0
     public private(set) var processID: Int32?
-    private var pending = Set<String>()
+    private var pending: [String:Int] = [:]
+    private var calls: [String:[String]] = [:]
+    private var ambiguousGroups = Set<String>()
+    private var uncertainGroups = Set<String>()
+    private var turnEnded=false
+    public var pendingRequestIDs: Set<String> { Set(pending.keys.filter { !ambiguousGroups.contains($0) }).union(ambiguousGroups.flatMap { calls[$0] ?? [] }) }
     public init() {}
     public mutating func apply(_ event: HookEvent) {
         guard event.timestamp >= timestamp else { return }
-        if event.kind == "UserPromptSubmit" { pending.removeAll(); turnID=event.turnID; status = .working }
+        if turnEnded,["PreToolUse","PermissionRequest","PostToolUse"].contains(event.kind) { return }
+        if !["UserPromptSubmit","SessionStart"].contains(event.kind), let current=processID,let incoming=event.processID,current != incoming { return }
+        if event.kind == "UserPromptSubmit" { pending.removeAll(); calls.removeAll(); ambiguousGroups.removeAll();uncertainGroups.removeAll(); turnID=event.turnID;turnEnded=false; status = .working }
         else {
             guard event.turnID == nil || turnID == nil || event.turnID == turnID else { return }
             if turnID == nil { turnID = event.turnID }
             switch event.kind {
-            case "Stop", "Interrupt", "SessionEnd": pending.removeAll(); status = .idle
-            case "SessionStart": status = .idle
-            case "PermissionRequest": pending.insert(event.toolID ?? event.toolName ?? "permission"); status = .needsInput
+            case "Stop", "Interrupt", "SessionEnd": pending.removeAll(); calls.removeAll(); ambiguousGroups.removeAll();uncertainGroups.removeAll();turnEnded=true; status = .idle
+            case "SessionStart": pending.removeAll();calls.removeAll();ambiguousGroups.removeAll();uncertainGroups.removeAll();turnID=nil;turnEnded=true;status = .idle
+            case "PermissionRequest":
+                let digest=event.toolID ?? event.toolName ?? "permission"
+                let candidates=(calls[digest] ?? []).filter { pending[$0] == nil }
+                let key=event.requestID ?? (candidates.count == 1 ? candidates[0] : digest)
+                if event.requestID == nil, candidates.count > 1 { ambiguousGroups.insert(digest) }
+                pending[key,default:0] += 1; status = .needsInput
             case "PreToolUse":
-                if Self.isInputTool(event.toolName) { pending.insert(event.toolID ?? event.toolName ?? "input"); status = .needsInput }
+                if let digest=event.toolID, let id=event.requestID { calls[digest,default:[]].append(id) }
+                if Self.isInputTool(event.toolName) { pending[event.requestID ?? event.toolID ?? event.toolName ?? "input",default:0] += 1; status = .needsInput }
             case "PostToolUse":
-                pending.remove(event.toolID ?? event.toolName ?? "permission")
-                status = pending.isEmpty ? .working : .needsInput
+                let key=event.requestID.flatMap { pending[$0] != nil ? $0 : nil } ?? event.toolID ?? event.toolName ?? "permission"
+                if let count=pending[key], !(ambiguousGroups.contains(key) && event.requestID != nil) { if count > 1 { pending[key]=count-1 } else { pending.removeValue(forKey:key) } }
+                if let id=event.requestID { resolveCompletedTools([id]) }
+                updatePendingStatus()
             default: break
             }
         }
         timestamp = event.timestamp; processID = event.processID ?? processID
     }
-    public mutating func reconcileProcess(isAlive: Bool) { if !isAlive { status = .idle; pending.removeAll() } }
+    public mutating func reconcileProcess(isAlive: Bool) { if !isAlive { status = .idle;turnEnded=true;pending.removeAll();calls.removeAll();ambiguousGroups.removeAll();uncertainGroups.removeAll() } }
+    public mutating func resolveCompletedTools(_ ids: Set<String>) {
+        // Rejected approvals do not emit PostToolUse; their exact call ID has a rollout result.
+        guard !turnEnded else { return }
+        var resolved=false
+        for id in ids where pending[id] != nil { pending.removeValue(forKey:id); resolved=true }
+        for key in Array(calls.keys) {
+            let before=calls[key] ?? []
+            calls[key]?.removeAll { ids.contains($0) }
+            if ambiguousGroups.contains(key), before.contains(where:{ids.contains($0)}) {
+                resolved=true
+                if calls[key]?.isEmpty == true { pending.removeValue(forKey:key);ambiguousGroups.remove(key);uncertainGroups.remove(key) }
+                else { uncertainGroups.insert(key) }
+            }
+            if calls[key]?.isEmpty == true { calls.removeValue(forKey:key) }
+        }
+        if resolved { updatePendingStatus() }
+    }
+    private mutating func updatePendingStatus() {
+        if pending.isEmpty { status = .working }
+        else if pending.keys.contains(where:{ !ambiguousGroups.contains($0) || !uncertainGroups.contains($0) }) { status = .needsInput }
+        else { status = .unknown }
+    }
     public static func isInputTool(_ name: String?) -> Bool {
         guard let name else { return false }; return name.contains("request_user_input") || name.contains("requestUserInput") || name.contains("elicitation")
     }

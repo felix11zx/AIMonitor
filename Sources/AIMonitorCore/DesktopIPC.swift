@@ -64,7 +64,7 @@ public final class DesktopIPC {
                         }
                     }
                 }
-                for id in subscribed { try? follow(id,false) }
+                for id in subscribed { do { try follow(id,false) } catch { break } }
             } catch { if !settings().0 { onEvent(.disconnected(error.localizedDescription)) } }
             if fd >= 0 { Darwin.close(fd) }
             for _ in 0..<12 { if settings().0 { break };Thread.sleep(forTimeInterval:0.25) }
@@ -73,12 +73,17 @@ public final class DesktopIPC {
     private static func connect(path: String) throws -> Int32 {
         var info=stat()
         guard lstat(path,&info) == 0,(info.st_mode & S_IFMT) == S_IFSOCK,info.st_uid == getuid(),info.st_mode & 0o077 == 0 else { throw MonitorError.invalid("Codex Desktop ist nicht geöffnet oder sein Socket ist nicht verfügbar") }
+        var parent=stat()
+        let folder=URL(fileURLWithPath:path).deletingLastPathComponent().path
+        guard lstat(folder,&parent) == 0,parent.st_mode & S_IFMT == S_IFDIR,parent.st_uid == getuid(),parent.st_mode & 0o077 == 0 else { throw MonitorError.invalid("Codex-IPC-Verzeichnis ist nicht privat") }
         var address=sockaddr_un();address.sun_family=sa_family_t(AF_UNIX)
         let bytes=Array(path.utf8CString)
         guard bytes.count <= MemoryLayout.size(ofValue:address.sun_path) else { throw MonitorError.invalid("Codex-Socketpfad ist zu lang") }
         withUnsafeMutableBytes(of:&address.sun_path) { raw in raw.copyBytes(from:bytes.map { UInt8(bitPattern:$0) }) }
         let fd=socket(AF_UNIX,SOCK_STREAM,0)
         guard fd >= 0 else { throw MonitorError.invalid("Desktop-Socket konnte nicht geöffnet werden") }
+        var timeout=timeval(tv_sec:1,tv_usec:0)
+        setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&timeout,socklen_t(MemoryLayout.size(ofValue:timeout)))
         var yes:Int32=1;setsockopt(fd,SOL_SOCKET,SO_NOSIGPIPE,&yes,socklen_t(MemoryLayout.size(ofValue:yes)))
         let result=withUnsafePointer(to:&address) { pointer in pointer.withMemoryRebound(to:sockaddr.self,capacity:1) { Darwin.connect(fd,$0,socklen_t(MemoryLayout<sockaddr_un>.size)) } }
         guard result == 0 else { Darwin.close(fd);throw MonitorError.invalid("Codex Desktop ist nicht verbunden") }
