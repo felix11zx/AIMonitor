@@ -92,4 +92,6 @@ Weitere Startmodi: `--verify`, `--debug`, `--logs`, `--telemetry`. Das Bundle is
 
 AIMonitor ist unter der [MIT-Lizenz](LICENSE) veröffentlicht und ein unabhängiges Community-Projekt, kein offizielles OpenAI-Produkt.
 
+Bei der Entwicklung der App wurde künstliche Intelligenz (KI) verwendet. Auch das Logo wurde mit KI erstellt.
+
 Die Anbindung folgt den [Codex App-Server-Verträgen](https://learn.chatgpt.com/docs/app-server) und der [Codex-Hook-Dokumentation](https://learn.chatgpt.com/docs/hooks).
