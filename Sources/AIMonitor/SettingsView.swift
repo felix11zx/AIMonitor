@@ -30,12 +30,13 @@ struct SettingsView:View {
                 TextField("Codex-Programm",text:$executable).textFieldStyle(.roundedBorder)
                 HStack { Text("Die vorhandene Codex-Anmeldung wird verwendet.").font(.caption).foregroundStyle(.secondary);Spacer();Button("Übernehmen") { store.configure(home:home,executable:executable) }.disabled(home.isEmpty || executable.isEmpty) }
             }
+            UpdateSection()
             HStack {
-                Text("AIMonitor · 0.1.0").font(.caption).foregroundStyle(.secondary)
+                Text("AIMonitor").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("AIMonitor beenden") { NSApp.terminate(nil) }
             }
-        }.formStyle(.grouped).padding(8).frame(width:480,height:510)
+        }.formStyle(.grouped).padding(8).frame(width:480,height:650)
         .onAppear { home=store.homePath;executable=store.executablePath }
     }
 }

@@ -1,5 +1,18 @@
 # AIMonitor — Prüfnachweise
 
+## Release 0.2.0 — 4. Oktober 2026
+
+- `swift test`: **23 Tests, 0 Fehler**, einschließlich fünf neuer Update-Tests (numerischer Versionsvergleich, neue/gleiche/ältere Version, Entwürfe/Vorabversionen, ungültige Antworten, HTTP-Fehler, fehlende Releases, Offline-Fall sowie Anfrage ohne Authentifizierung oder Nutzdaten).
+- `python3 script/test_codex_integration.py`: **6 Integrationstests erfolgreich** gegen die Universal-Release-Binary; isolierte Test-Konfigurationen und lokaler Modell-Testserver.
+- `./script/package_release.sh`: optimierte Universal-App und `AIMonitor-0.2.0-macOS-universal.zip` erzeugt. Beide Mach-O-Architekturen (`arm64`, `x86_64`) setzen **macOS 14.0** als Mindestversion. Intel wurde kompiliert, aber nicht auf echter Intel-Hardware ausgeführt.
+- Ad-hoc-Signatur mit `codesign --verify --deep --strict` geprüft; keine Developer-ID-Signatur und keine Notarisierung.
+- ZIP erneut in ein temporäres Verzeichnis entpackt: gültige Signatur, ausführbare Binary und identischer Binary-Inhalt. `shasum -a 256 -c SHA256SUMS.txt`: **OK**.
+- Universal-App auf Apple Silicon als `.app` gestartet; Prozess und native Oberfläche geprüft. In Einstellungen sichtbar: **Installiert: 0.2.0** und **Nach Updates suchen**. Klick vor der ersten GitHub-Veröffentlichung liefert korrekt **Noch keine veröffentlichte Version verfügbar**.
+- Neue Versionen öffnen eine Download-Seite im festen Repository `felix11zx/AIMonitor`; Installation bleibt manuell. Die Prüfung erfolgt nur auf Knopfdruck und überträgt keine Codex-Daten oder Zugangsdaten.
+- Deutsche README, Installationsanleitung, Release-Anleitung und MIT-Lizenz hinzugefügt; bestehendes App-Icon in Bundle und Repository aufgenommen.
+
+Die folgenden Nachweise dokumentieren die ursprüngliche Version 0.1.0.
+
 Stand: 2. Oktober 2026, Europe/Vienna. Swift 6.4 / macOS-SDK 27; Deployment Target macOS 14. Codex CLI 0.154.0, Desktop-Build 154.0.8037.57.
 
 ## Automatische Prüfung

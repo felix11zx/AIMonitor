@@ -51,7 +51,7 @@ import OSLog
         present(monitor!);store.refresh();logger.info("Monitor opened")
     }
     func showSettings() {
-        if settings == nil { settings=window(title:"AIMonitor – Einstellungen",content:NSHostingView(rootView:SettingsView(store:store)),size:NSSize(width:480,height:510),autosave:"AIMonitorSettings");settings?.styleMask.remove(.resizable) }
+        if settings == nil { settings=window(title:"AIMonitor – Einstellungen",content:NSHostingView(rootView:SettingsView(store:store)),size:NSSize(width:480,height:650),autosave:"AIMonitorSettings");settings?.styleMask.remove(.resizable) }
         present(settings!);logger.info("Settings opened")
     }
     private func window(title:String,content:NSView,size:NSSize,autosave:String)->NSWindow {
