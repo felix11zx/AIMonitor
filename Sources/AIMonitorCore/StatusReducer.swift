@@ -17,10 +17,13 @@ public struct DesktopState {
     public mutating func apply(_ change: JSONValue) throws {
         do {
             guard let next = change["revision"].number else { throw MonitorError.invalid("IPC-Revision fehlt") }
-            if change["type"].string == "snapshot" { json = change["conversationState"]; revision = next; return }
-            guard change["type"].string == "patches", let revision, change["baseRevision"].number == revision, next > revision else { throw MonitorError.invalid("IPC-Snapshot muss erneut geladen werden") }
+            if change["type"].string == "snapshot", change["conversationState"].object != nil {
+                json = change["conversationState"]; revision = next; return
+            }
+            guard change["type"].string == "patches", let revision, change["baseRevision"].number == revision, next > revision,
+                  let patches = change["patches"].array else { throw MonitorError.invalid("IPC-Snapshot muss erneut geladen werden") }
             var candidate = json
-            for patch in change["patches"].array ?? [] {
+            for patch in patches {
                 guard let path = patch["path"].array, let op = patch["op"].string, ["add","remove","replace"].contains(op) else { throw MonitorError.invalid("Unbekannter IPC-Patch") }
                 try candidate.patch(path: path, operation: op, value: patch["value"])
             }

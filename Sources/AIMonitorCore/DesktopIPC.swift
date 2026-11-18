@@ -54,7 +54,7 @@ public final class DesktopIPC {
                         } else if message["type"].string == "client-discovery-request" {
                             try Self.write(.object(["type":.string("client-discovery-response"),"requestId":message["requestId"],"response":.object(["canHandle":.bool(false)])]),fd:fd)
                         } else if method == "thread-stream-state-changed",message["params"]["hostId"].string == "local",let id=message["params"]["conversationId"].string,subscribed.contains(id) {
-                            guard message["version"].number == 11 else { throw MonitorError.invalid("Diese Codex-Desktop-Version benötigt eine aktualisierte AIMonitor-Anbindung") }
+                            guard Self.supportsStateVersion(message["version"].number) else { throw MonitorError.invalid("Diese Codex-Desktop-Version benötigt eine aktualisierte AIMonitor-Anbindung") }
                             var state=states[id] ?? DesktopState()
                             do { try state.apply(message["params"]["change"]);states[id]=state;onEvent(.status(id,state.status)) }
                             catch { states.removeValue(forKey:id);onEvent(.status(id,.unknown));try follow(id,false);try follow(id,true) }
@@ -68,6 +68,12 @@ public final class DesktopIPC {
             } catch { if !settings().0 { onEvent(.disconnected(error.localizedDescription)) } }
             if fd >= 0 { Darwin.close(fd) }
             for _ in 0..<12 { if settings().0 { break };Thread.sleep(forTimeInterval:0.25) }
+        }
+    }
+    static func supportsStateVersion(_ version: Double?) -> Bool {
+        switch version {
+        case 11, 12, 13: return true
+        default: return false
         }
     }
     private static func connect(path: String) throws -> Int32 {

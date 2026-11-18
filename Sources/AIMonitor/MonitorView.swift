@@ -98,7 +98,9 @@ private struct LimitRow: View {
             }
             if let remaining=window.remainingPercent {
                 ProgressView(value:remaining,total:100).tint(tint).animation(reduceMotion ? nil : .easeInOut(duration:0.2),value:remaining)
-                Text("\(Int(window.usedPercent ?? 0)) % verbraucht").font(.caption2).foregroundStyle(.secondary)
+                if let used = window.usedPercent {
+                    Text("\(used, format: .number.precision(.fractionLength(0))) % verbraucht").font(.caption2).foregroundStyle(.secondary)
+                }
             } else { Text("Nutzungswert nicht verfügbar").font(.caption).foregroundStyle(.secondary) }
             if let reset=window.resetAt {
                 TimelineView(.periodic(from:.now,by:1)) { timeline in

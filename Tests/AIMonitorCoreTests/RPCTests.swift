@@ -2,7 +2,7 @@ import XCTest
 @testable import AIMonitorCore
 
 final class RPCTests: XCTestCase {
-    func testIdleConnectionProcessesLimitInvalidationWithoutPollingRead() async throws {
+    func testLimitInvalidationDuringRequestAndOnIdleConnection() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:root) }
@@ -16,13 +16,17 @@ final class RPCTests: XCTestCase {
         for line in sys.stdin:
             request=json.loads(line)
             if 'id' not in request: continue
+            if request['method']=='account/rateLimits/read':
+                assert request['params']['excludeResetCreditDetails'] is True
+                print(json.dumps({'method':'account/updated','params':{'authMode':'chatgpt'}}),flush=True)
             result={} if request['method']=='initialize' else {'rateLimits':{'limitId':'codex','primary':{'usedPercent':20,'windowDurationMins':300}}}
             print(json.dumps({'id':request['id'],'result':result}),flush=True)
             if request['method']=='account/rateLimits/read': threading.Thread(target=invalidation,daemon=True).start()
         """
         try Data(script.utf8).write(to:executable)
         try FileManager.default.setAttributes([.posixPermissions:0o700],ofItemAtPath:executable.path)
-        let changed=expectation(description:"rate-limit update consumed while idle")
+        let changed=expectation(description:"account change before the response and rate-limit update while idle")
+        changed.expectedFulfillmentCount=2
         let rpc=CodexRPC()
         let result=try await rpc.readLimits(executable:executable.path,home:root,onLimitsChanged:{ changed.fulfill() })
         XCTAssertEqual(result.windows.first?.remainingPercent,80)

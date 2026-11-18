@@ -18,7 +18,7 @@ import AIMonitorCore
     @Published var interval: Double { didSet { UserDefaults.standard.set(interval,forKey:"refreshInterval");nextRefresh = .distantPast } }
     @Published private(set) var homePath: String
     @Published private(set) var executablePath: String
-    private let rpc=CodexRPC()
+    private var rpc=CodexRPC()
     private var desktop=DesktopIPC()
     private var desktopStatuses:[String:AgentStatus]=[:]
     private var cliStates:[String:CLIState]=[:]
@@ -39,11 +39,23 @@ import AIMonitorCore
         appearance=defaults.string(forKey:"appearance") ?? "system"
         let stored=defaults.double(forKey:"refreshInterval");interval=[15,30,60].contains(stored) ? stored : 30
         homePath=defaults.string(forKey:"codexHome") ?? ProcessInfo.processInfo.environment["CODEX_HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex").path
-        executablePath=NSString(string:defaults.string(forKey:"codexExecutable") ?? Self.findCodex()).expandingTildeInPath
+        executablePath=Self.resolveCodex(preferred:defaults.string(forKey:"codexExecutable"))
         cliEnabled=HookInstaller.isEnabled(home:home)
     }
     nonisolated static func findCodex() -> String {
-        ["/opt/homebrew/bin/codex","/usr/local/bin/codex","/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex","/Applications/Codex.app/Contents/Resources/codex"].first { FileManager.default.isExecutableFile(atPath:$0) } ?? "/opt/homebrew/bin/codex"
+        let bundled = "ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+        let userApplications = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
+        let candidates = ["/Applications/" + bundled, userApplications.appendingPathComponent(bundled).path,
+                          "/opt/homebrew/bin/codex", "/usr/local/bin/codex", oldChatGPTExecutable,
+                          "/Applications/Codex.app/Contents/Resources/codex"]
+        return candidates.first(where: FileManager.default.isExecutableFile(atPath:)) ?? "/opt/homebrew/bin/codex"
+    }
+    private nonisolated static let oldChatGPTExecutable = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
+    private nonisolated static func resolveCodex(preferred: String?) -> String {
+        guard let preferred else { return findCodex() }
+        let path = NSString(string:preferred).expandingTildeInPath
+        if path == oldChatGPTExecutable, !FileManager.default.isExecutableFile(atPath:path) { return findCodex() }
+        return path
     }
     func start() {
         guard loop == nil else { return }
@@ -64,7 +76,7 @@ import AIMonitorCore
         loop=Task { [weak self] in
             while !Task.isCancelled {
                 await self?.reconcile()
-                guard let self else { return }
+                guard let self,!Task.isCancelled else { return }
                 if Date() >= self.nextRefresh { self.refresh() }
                 for window in self.windows {
                     if let reset=window.resetAt,reset <= Date(),self.lastRefresh.map({ $0 < reset }) == true,!self.resetAttempts.contains(window.id+reset.description) {
@@ -76,22 +88,29 @@ import AIMonitorCore
         }
         refresh()
     }
-    func stop() { loop?.cancel();loop=nil;desktop.stop();Task { await rpc.shutdown() } }
+    func stop() {
+        loop?.cancel();loop=nil;desktop.stop()
+        let rpc = rpc
+        Task { await rpc.shutdown() }
+    }
     func refresh() {
         guard !isRefreshing else { return }
         isRefreshing=true;nextRefresh=Date().addingTimeInterval(interval)
-        let executable=executablePath,home=home,token=generation
-        Task {
+        let executable=executablePath,home=home,token=generation,rpc=rpc
+        Task { [self] in
             do {
                 let snapshot=try await rpc.readLimits(executable:executable,home:home,onLimitsChanged:{ [weak self] in
                     Task { @MainActor in
-                        guard let self,self.generation == token,!self.isRefreshing else { return }
+                        guard let self,self.generation == token else { return }
                         self.nextRefresh = .distantPast
                     }
                 })
-                guard generation == token else { isRefreshing=false;return }
+                guard generation == token else { await rpc.shutdown();return }
                 windows=snapshot.windows;lastRefresh=Date();limitError=snapshot.windows.isEmpty ? "Für dieses Konto wurden keine Limits geliefert." : nil
-            } catch { if generation == token { limitError=error.localizedDescription } }
+            } catch {
+                guard generation == token else { return }
+                limitError=error.localizedDescription
+            }
             isRefreshing=false
         }
     }
@@ -136,9 +155,10 @@ import AIMonitorCore
         onStatusChanged?()
     }
     func configure(home: String, executable: String) {
-        stop();generation+=1;desktop=DesktopIPC();desktopStatuses.removeAll();cliStates.removeAll();statuses.removeAll();windows=[];lastRefresh=nil
+        stop();generation+=1;rpc=CodexRPC();desktop=DesktopIPC();isRefreshing=false
+        desktopStatuses.removeAll();cliStates.removeAll();statuses.removeAll();windows=[];lastRefresh=nil
         desktopConnected=false;desktopMessage="Verbindung wird hergestellt …";catalogError=nil;hookMessage=nil;limitError=nil
-        homePath=home;executablePath=NSString(string:executable).expandingTildeInPath
+        homePath=home;executablePath=Self.resolveCodex(preferred:executable)
         UserDefaults.standard.set(home,forKey:"codexHome");UserDefaults.standard.set(executablePath,forKey:"codexExecutable")
         nextRefresh = .distantPast;resetAttempts.removeAll();start()
     }

@@ -32,11 +32,18 @@ public struct UsageWindow: Identifiable, Sendable {
 public struct UsageSnapshot: Sendable {
     public let windows: [UsageWindow]
     public static func decode(_ json: JSONValue) -> Self {
-        let buckets = json["rateLimitsByLimitId"].object ?? [json["rateLimits"]["limitId"].string ?? "codex": json["rateLimits"]]
+        let legacy = json["rateLimits"]
+        let legacyID = legacy["limitId"].string ?? "codex"
+        let kinds = ["primary", "secondary"]
+        var buckets = json["rateLimitsByLimitId"].object ?? [:]
+        let metered = buckets[legacyID] ?? .null
+        if legacy.object != nil, !kinds.contains(where: { metered[$0].object != nil }) {
+            buckets[legacyID] = legacy
+        }
         var result: [UsageWindow] = []
         for key in buckets.keys.sorted() {
             guard let bucket = buckets[key] else { continue }
-            for kind in ["primary", "secondary"] {
+            for kind in kinds {
                 let window = bucket[kind]
                 guard window.object != nil else { continue }
                 result.append(UsageWindow(id: key + "." + kind, bucket: bucket["limitName"].string ?? key,

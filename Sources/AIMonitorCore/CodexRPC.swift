@@ -42,7 +42,11 @@ public actor CodexRPC {
                 }
             }
             let id=nextID;nextID+=1
-            try send(.object(["id":.number(Double(id)),"method":.string("account/rateLimits/read")]))
+            try send(.object([
+                "id": .number(Double(id)),
+                "method": .string("account/rateLimits/read"),
+                "params": .object(["excludeResetCreditDetails": .bool(true)])
+            ]))
             return UsageSnapshot.decode(try response(id:id))
         } catch {
             shutdown()
@@ -64,7 +68,7 @@ public actor CodexRPC {
             if let newline=buffer.firstIndex(of:10) {
                 let line=Data(buffer[..<newline]);buffer=Data(buffer.dropFirst(buffer.distance(from:buffer.startIndex,to:newline)+1))
                 guard let message=try? JSONDecoder().decode(JSONValue.self,from:line) else { continue }
-                if message["method"].string == "account/rateLimits/updated" { onLimitsChanged?();continue }
+                if invalidateLimits(for:message) { continue }
                 guard message["id"].number == Double(id) else { continue }
                 if message["error"].object != nil {
                     let message=message["error"]["message"].string?.lowercased() ?? ""
@@ -97,8 +101,17 @@ public actor CodexRPC {
         while let newline=buffer.firstIndex(of:10) {
             let line=Data(buffer[..<newline]);buffer=Data(buffer.dropFirst(buffer.distance(from:buffer.startIndex,to:newline)+1))
             guard let message=try? JSONDecoder().decode(JSONValue.self,from:line) else { continue }
-            if message["method"].string == "account/rateLimits/updated" { onLimitsChanged?() }
-            else if let number=message["id"].number,number.isFinite,number >= 0,number < Double(Int.max),number.rounded() == number { pendingResponses[Int(number)]=message }
+            if invalidateLimits(for:message) { continue }
+            if let number=message["id"].number,number.isFinite,number >= 0,number < Double(Int.max),number.rounded() == number { pendingResponses[Int(number)]=message }
+        }
+    }
+    private func invalidateLimits(for message: JSONValue) -> Bool {
+        switch message["method"].string {
+        case "account/rateLimits/updated", "account/updated":
+            onLimitsChanged?()
+            return true
+        default:
+            return false
         }
     }
     public func shutdown() {

@@ -49,7 +49,7 @@ Die Dateien liegen anschließend unter `dist/`. [Neue GitHub-Version veröffentl
 
 ## Codex verbinden
 
-Desktop-Status wird automatisch über den lokalen Socket im Codex-Verzeichnis beobachtet. Codex Desktop muss geöffnet sein. Limits liest die App über einen eigenen, ausschließlich für Konto-Abfragen verwendeten `codex app-server`-Prozess. Desktop und CLI teilen Konto-Limits; AIMonitor zählt sie einmal.
+Desktop-Status wird automatisch über den lokalen Socket im Codex-Verzeichnis beobachtet. Dafür muss der Codex-Bereich der ChatGPT-Desktop-App verfügbar sein. AIMonitor liest die Limits über einen eigenen `codex app-server`-Prozess und verwendet standardmäßig die mit ChatGPT installierte Codex-CLI, sofern sie vorhanden ist. Desktop und CLI teilen sich das angezeigte Konto-Kontingent.
 
 Limits werden standardmäßig alle 30 Sekunden aktualisiert, wählbar alle 15/30/60 Sekunden. Desktop-Status wird als Ereignis empfangen; CLI-Status wird alle zwei Sekunden abgeglichen. Der Countdown läuft jede Sekunde. Ein erreichter Reset wird erneut geprüft; die App setzt den Verbrauch nicht selbst auf null.
 

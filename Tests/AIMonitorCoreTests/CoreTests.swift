@@ -12,6 +12,26 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(snapshot.windows.first(where: { $0.id == "codex.primary" })?.resetAt?.timeIntervalSince1970, 1790960000)
     }
 
+    func testLegacyQuotaIsRetainedWhenMeteredResponseOmitsItsWindows() throws {
+        let input = try JSONValue.parse(#"{"rateLimits":{"limitId":"codex","primary":{"usedPercent":7},"secondary":{"usedPercent":1}},"rateLimitsByLimitId":{"codex":{"primary":null},"other":{"primary":{"usedPercent":25}}}}"#)
+        let windows = UsageSnapshot.decode(input).windows
+        XCTAssertEqual(windows.map(\.id), ["codex.primary", "codex.secondary", "other.primary"])
+        XCTAssertEqual(windows.compactMap(\.remainingPercent), [93, 99, 75])
+    }
+
+    func testDesktopAcceptsCurrentStateStreamVersion() throws {
+        XCTAssertTrue(DesktopIPC.supportsStateVersion(11))
+        XCTAssertTrue(DesktopIPC.supportsStateVersion(13))
+        XCTAssertFalse(DesktopIPC.supportsStateVersion(14))
+        XCTAssertFalse(DesktopIPC.supportsStateVersion(nil))
+
+        var state = DesktopState()
+        try state.apply(JSONValue.parse(#"{"type":"snapshot","revision":1,"conversationState":{"threadRuntimeStatus":{"type":"active","activeFlags":[]},"requests":[]}}"#))
+        XCTAssertEqual(state.status, .working)
+        try state.apply(JSONValue.parse(#"{"type":"patches","revision":2,"baseRevision":1,"patches":[{"op":"replace","path":["threadRuntimeStatus"],"value":{"type":"idle"}}],"acceptedTextChanges":[]}"#))
+        XCTAssertEqual(state.status, .idle)
+    }
+
     func testDesktopRequestsKeepOrangeUntilAllAreResolvedAndRejectRevisionGap() throws {
         var state = DesktopState()
         try state.apply(JSONValue.parse(#"{"type":"snapshot","revision":2,"conversationState":{"threadRuntimeStatus":{"type":"active","activeFlags":[]},"requests":[{"id":"a"},{"id":"b"}]}}"#))
