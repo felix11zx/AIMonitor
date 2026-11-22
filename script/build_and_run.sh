@@ -31,6 +31,7 @@ fi
 mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
 cp "$ICON_FILE" "$BUNDLE/Contents/Resources/AppIcon.icns"
 cp "$ROOT_DIR/LICENSE" "$BUNDLE/Contents/Resources/LICENSE"
+cp "$ROOT_DIR/Resources/RemixIcon-LICENSE.txt" "$BUNDLE/Contents/Resources/"
 cp "$BUILD_DIR/AIMonitor" "$BUNDLE/Contents/MacOS/AIMonitor.next"
 chmod +x "$BUNDLE/Contents/MacOS/AIMonitor.next"
 mv "$BUNDLE/Contents/MacOS/AIMonitor.next" "$BUNDLE/Contents/MacOS/AIMonitor"
